@@ -1,5 +1,7 @@
 class ChatClient {
     constructor() {
+        // Generar o recuperar ID de usuario único
+        this.userId = this.getUserId();
         this.username = this.generateUsername();
         this.socket = null;
         this.isConnected = false;
@@ -10,8 +12,8 @@ class ChatClient {
         this.isTyping = false;
         this.typingIndicators = new Map();
         this.pendingMessages = new Map(); // Para mensajes enviados por este usuario
-        this.readReceipts = new Map(); // Para rastrear lecturas
         this.observedMessages = new Set(); // Para rastrear mensajes observados
+        this.onlineUsers = new Set(); // Para rastrear usuarios conectados
         
         this.initializeElements();
         this.initializeSocket();
@@ -19,13 +21,15 @@ class ChatClient {
         this.setupIntersectionObserver();
     }
 
-    initializeElements() {
-        this.messagesContainer = document.getElementById('messagesContainer');
-        this.messageForm = document.getElementById('messageForm');
-        this.messageInput = document.getElementById('messageInput');
-        this.connectionStatus = document.getElementById('connectionStatus');
-        this.sendButton = document.getElementById('sendButton');
-        this.imageInput = document.getElementById('imageInput');
+    getUserId() {
+        // Intentar recuperar ID de usuario existente
+        let userId = localStorage.getItem('chat-user-id');
+        if (!userId) {
+            // Generar nuevo ID único
+            userId = 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('chat-user-id', userId);
+        }
+        return userId;
     }
 
     generateUsername() {
@@ -35,6 +39,15 @@ class ChatClient {
         const noun = nouns[Math.floor(Math.random() * nouns.length)];
         const num = Math.floor(Math.random() * 1000);
         return `${adj}${noun}${num}`;
+    }
+
+    initializeElements() {
+        this.messagesContainer = document.getElementById('messagesContainer');
+        this.messageForm = document.getElementById('messageForm');
+        this.messageInput = document.getElementById('messageInput');
+        this.connectionStatus = document.getElementById('connectionStatus');
+        this.sendButton = document.getElementById('sendButton');
+        this.imageInput = document.getElementById('imageInput');
     }
 
     initializeSocket() {
@@ -56,10 +69,14 @@ class ChatClient {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     const messageId = entry.target.dataset.messageId;
+                    const messageUserId = entry.target.dataset.userId;
                     const isOwnMessage = entry.target.classList.contains('user');
                     
                     // Solo enviar acuse de lectura para mensajes de otros usuarios
-                    if (messageId && !isOwnMessage && !this.observedMessages.has(messageId)) {
+                    // y solo si no es nuestro propio mensaje
+                    if (messageId && !isOwnMessage && 
+                        !this.observedMessages.has(messageId) && 
+                        messageUserId !== this.userId) {
                         this.observedMessages.add(messageId);
                         this.sendReadReceipt(messageId);
                         
@@ -77,6 +94,9 @@ class ChatClient {
         this.socket.onopen = () => {
             console.log('✅ Conectado al servidor WebSocket');
             this.isConnected = true;
+            
+            // Enviar información de usuario al conectarse
+            this.sendUserInfo();
             this.updateConnectionStatus(true);
             this.enableInputs();
         };
@@ -87,6 +107,9 @@ class ChatClient {
                 const messageData = JSON.parse(event.data);
                 
                 switch (messageData.type) {
+                    case 'user-info':
+                        this.handleUserInfo(messageData);
+                        break;
                     case 'typing':
                         this.handleTypingMessage(messageData);
                         break;
@@ -127,6 +150,24 @@ class ChatClient {
             this.updateConnectionStatus(false);
             this.disableInputs();
         };
+    }
+
+    sendUserInfo() {
+        const userInfo = {
+            type: 'user-info',
+            userId: this.userId,
+            username: this.username,
+            timestamp: new Date().toISOString()
+        };
+        this.socket.send(JSON.stringify(userInfo));
+    }
+
+    handleUserInfo(userInfo) {
+        // Registrar usuario conectado
+        if (userInfo.userId !== this.userId) {
+            this.onlineUsers.add(userInfo.userId);
+            console.log('👥 Usuario conectado:', userInfo.username);
+        }
     }
 
     setupEventListeners() {
@@ -177,6 +218,7 @@ class ChatClient {
             this.isTyping = true;
             const typingMessage = {
                 type: 'typing',
+                userId: this.userId,
                 username: this.username,
                 timestamp: new Date().toISOString()
             };
@@ -196,6 +238,7 @@ class ChatClient {
             
             const stopTypingMessage = {
                 type: 'stop-typing',
+                userId: this.userId,
                 username: this.username,
                 timestamp: new Date().toISOString()
             };
@@ -204,20 +247,23 @@ class ChatClient {
     }
 
     handleTypingMessage(messageData) {
-        if (messageData.username === this.username) return;
+        if (messageData.userId === this.userId) return;
         this.showTypingIndicator(messageData.username);
     }
 
     handleStopTypingMessage(messageData) {
-        if (messageData.username === this.username) return;
+        if (messageData.userId === this.userId) return;
         this.hideTypingIndicator(messageData.username);
     }
 
     handleReadReceipt(receiptData) {
-        // Marcar mensaje como leído por al menos un usuario
+        // Verificar que el lector no sea el mismo usuario
+        if (receiptData.readerId === this.userId) return;
+        
+        // Marcar mensaje como leído por al menos un usuario diferente
         if (this.pendingMessages.has(receiptData.messageId)) {
             const messageInfo = this.pendingMessages.get(receiptData.messageId);
-            messageInfo.readBy.add(receiptData.reader);
+            messageInfo.readBy.add(receiptData.readerId);
             
             // Actualizar visualmente el mensaje
             if (messageInfo.element) {
@@ -239,7 +285,7 @@ class ChatClient {
             return;
         }
         
-        const isOwnMessage = messageData.username === this.username;
+        const isOwnMessage = messageData.userId === this.userId;
         messageData.isOwn = isOwnMessage;
         
         this.hideTypingIndicator(messageData.username);
@@ -250,6 +296,7 @@ class ChatClient {
         const receiptMessage = {
             type: 'read-receipt',
             messageId: messageId,
+            readerId: this.userId,
             reader: this.username,
             timestamp: new Date().toISOString()
         };
@@ -344,6 +391,7 @@ class ChatClient {
         if (textMessage && this.isConnected) {
             const messageData = {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                userId: this.userId,
                 username: this.username,
                 content: textMessage,
                 timestamp: new Date().toISOString(),
@@ -362,6 +410,7 @@ class ChatClient {
         if (this.pendingImage && this.isConnected) {
             const messageData = {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                userId: this.userId,
                 username: this.username,
                 content: this.pendingImage,
                 timestamp: new Date().toISOString(),
@@ -391,6 +440,7 @@ class ChatClient {
         const messageElement = document.createElement('div');
         messageElement.className = `message ${messageData.isOwn ? 'user' : 'other'}`;
         messageElement.dataset.messageId = messageData.id;
+        messageElement.dataset.userId = messageData.userId; // Agregar ID de usuario
         
         // Agregar estado de lectura para mensajes propios
         if (messageData.isOwn) {
@@ -507,6 +557,7 @@ class ChatClient {
         this.messageTimers.clear();
         
         this.observedMessages.clear();
+        this.onlineUsers.clear();
     }
 
     updateConnectionStatus(connected) {

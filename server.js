@@ -43,14 +43,25 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocket.Server({ server });
 
+// Mantener registro de usuarios conectados
+const connectedUsers = new Map();
+
 wss.on('connection', (ws) => {
     console.log('🟢 Nuevo cliente conectado');
+    let userId = null;
     
     ws.on('message', (message) => {
         console.log('📨 Mensaje recibido del cliente:', message.toString());
         
         try {
             const messageData = JSON.parse(message.toString());
+            
+            // Registrar ID de usuario si es información de usuario
+            if (messageData.type === 'user-info') {
+                userId = messageData.userId;
+                connectedUsers.set(userId, { ws, username: messageData.username });
+                console.log(`👤 Usuario registrado: ${messageData.username} (${userId})`);
+            }
             
             // Reenviar mensaje a todos los clientes conectados
             wss.clients.forEach((client) => {
@@ -66,10 +77,17 @@ wss.on('connection', (ws) => {
     
     ws.on('close', () => {
         console.log('🔴 Cliente desconectado');
+        if (userId) {
+            connectedUsers.delete(userId);
+            console.log(`👤 Usuario desconectado: ${userId}`);
+        }
     });
     
     ws.on('error', (error) => {
         console.error('❌ Error en conexión WebSocket:', error);
+        if (userId) {
+            connectedUsers.delete(userId);
+        }
     });
 });
 
