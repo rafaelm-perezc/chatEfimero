@@ -43,12 +43,13 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocket.Server({ server });
 
-// Mantener registro de usuarios conectados
-const connectedUsers = new Map();
+// Almacenamiento de mensajes y usuarios
+const messages = []; // Almacenar todos los mensajes
+const connectedClients = new Set();
 
 wss.on('connection', (ws) => {
     console.log('🟢 Nuevo cliente conectado');
-    let userId = null;
+    connectedClients.add(ws);
     
     ws.on('message', (message) => {
         console.log('📨 Mensaje recibido del cliente:', message.toString());
@@ -56,20 +57,37 @@ wss.on('connection', (ws) => {
         try {
             const messageData = JSON.parse(message.toString());
             
-            // Registrar ID de usuario si es información de usuario
-            if (messageData.type === 'user-info') {
-                userId = messageData.userId;
-                connectedUsers.set(userId, { ws, username: messageData.username });
-                console.log(`👤 Usuario registrado: ${messageData.username} (${userId})`);
+            switch (messageData.type) {
+                case 'request-historical':
+                    // Enviar mensajes históricos al nuevo cliente
+                    ws.send(JSON.stringify({
+                        type: 'historical-messages',
+                        messages: messages
+                    }));
+                    break;
+                    
+                case 'user-info':
+                    // No necesitamos hacer nada especial
+                    break;
+                    
+                case 'typing':
+                case 'stop-typing':
+                case 'read-receipt':
+                    // Reenviar estos mensajes a todos los clientes
+                    broadcastMessage(message.toString(), ws);
+                    break;
+                    
+                case 'text':
+                case 'image':
+                    // Almacenar mensaje y reenviar
+                    messages.push(messageData);
+                    broadcastMessage(message.toString(), ws);
+                    break;
+                    
+                default:
+                    // Reenviar cualquier otro mensaje
+                    broadcastMessage(message.toString(), ws);
             }
-            
-            // Reenviar mensaje a todos los clientes conectados
-            wss.clients.forEach((client) => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(message.toString());
-                    console.log('📤 Mensaje reenviado a cliente');
-                }
-            });
         } catch (error) {
             console.error('❌ Error al procesar mensaje:', error);
         }
@@ -77,19 +95,23 @@ wss.on('connection', (ws) => {
     
     ws.on('close', () => {
         console.log('🔴 Cliente desconectado');
-        if (userId) {
-            connectedUsers.delete(userId);
-            console.log(`👤 Usuario desconectado: ${userId}`);
-        }
+        connectedClients.delete(ws);
     });
     
     ws.on('error', (error) => {
         console.error('❌ Error en conexión WebSocket:', error);
-        if (userId) {
-            connectedUsers.delete(userId);
-        }
+        connectedClients.delete(ws);
     });
 });
+
+function broadcastMessage(message, sender) {
+    connectedClients.forEach((client) => {
+        if (client !== sender && client.readyState === WebSocket.OPEN) {
+            client.send(message);
+            console.log('📤 Mensaje reenviado a cliente');
+        }
+    });
+}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
