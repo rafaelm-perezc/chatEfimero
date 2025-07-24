@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sala de Chat Local - Funcional</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>💬 Sala de Chat Local</h1>
+            <p>Mensajes efímeros - desaparecen en 5 segundos | Sin almacenamiento</p>
+        </div>
+        
+        <div class="connection-status status-disconnected" id="connectionStatus">
+            <span class="spinner"></span> Conectando al servidor...
+        </div>
+        
+        <div class="chat-container">
+            <div class="messages-area">
+                <div class="messages-container" id="messagesContainer">
+                    <!-- Los mensajes se mostrarán aquí -->
+                </div>
+                
+                <div class="input-container">
+                    <form class="input-form" id="messageForm">
+                        <div class="input-wrapper">
+                            <input 
+                                type="text" 
+                                class="message-input" 
+                                id="messageInput" 
+                                placeholder="Escribe tu mensaje..." 
+                                autocomplete="off"
+                                required
+                                disabled
+                            >
+                            <label for="imageInput" class="attach-button" title="Adjuntar imagen">
+                                <span class="attach-icon">📎</span>
+                                <input type="file" id="imageInput" accept="image/*" style="display: none;" disabled>
+                            </label>
+                        </div>
+                        <button type="submit" class="send-button" id="sendButton" disabled>
+                            Enviar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/chat-client.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
