@@ -9,6 +9,8 @@ class ChatClient {
         this.typingTimeout = null;
         this.isTyping = false;
         this.typingIndicators = new Map();
+        this.pendingMessages = new Map(); // Para mensajes enviados por este usuario
+        this.readReceipts = new Map(); // Para rastrear lecturas
         
         this.initializeElements();
         this.initializeSocket();
@@ -33,20 +35,18 @@ class ChatClient {
         return `${adj}${noun}${num}`;
     }
 
-    // En la función initializeSocket(), reemplaza la parte de conexión:
-initializeSocket() {
-    // Detectar automáticamente el protocolo y host
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    
-    try {
-        this.socket = new WebSocket(`${protocol}//${host}`);
-        this.setupWebSocketEvents();
-    } catch (error) {
-        console.error('Error al conectar al WebSocket:', error);
-        this.updateConnectionStatus(false);
+    initializeSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        
+        try {
+            this.socket = new WebSocket(`${protocol}//${host}`);
+            this.setupWebSocketEvents();
+        } catch (error) {
+            console.error('Error al conectar al WebSocket:', error);
+            this.updateConnectionStatus(false);
+        }
     }
-}
 
     setupWebSocketEvents() {
         this.socket.onopen = () => {
@@ -68,6 +68,9 @@ initializeSocket() {
                     case 'stop-typing':
                         this.handleStopTypingMessage(messageData);
                         break;
+                    case 'read-receipt':
+                        this.handleReadReceipt(messageData);
+                        break;
                     case 'text':
                     case 'image':
                         this.handleChatMessage(messageData);
@@ -86,6 +89,7 @@ initializeSocket() {
             this.updateConnectionStatus(false);
             this.disableInputs();
             this.clearAllTypingIndicators();
+            this.clearAllPendingMessages();
             
             setTimeout(() => {
                 this.initializeSocket();
@@ -119,6 +123,11 @@ initializeSocket() {
         
         this.messageInput.addEventListener('blur', () => {
             this.stopTyping();
+        });
+        
+        // Detectar cuando los mensajes entran en la vista (lectura)
+        this.messagesContainer.addEventListener('scroll', () => {
+            this.checkVisibleMessages();
         });
     }
 
@@ -165,6 +174,25 @@ initializeSocket() {
         this.hideTypingIndicator(messageData.username);
     }
 
+    handleReadReceipt(receiptData) {
+        // Marcar mensaje como leído por al menos un usuario
+        if (this.pendingMessages.has(receiptData.messageId)) {
+            const messageInfo = this.pendingMessages.get(receiptData.messageId);
+            messageInfo.readBy.add(receiptData.reader);
+            
+            // Actualizar visualmente el mensaje
+            if (messageInfo.element) {
+                messageInfo.element.classList.remove('pending-read');
+                messageInfo.element.classList.add('read');
+            }
+            
+            // Si es un mensaje propio, iniciar temporizador de eliminación
+            if (messageInfo.isOwn) {
+                this.startMessageDeletionTimer(messageInfo.element, receiptData.messageId);
+            }
+        }
+    }
+
     handleChatMessage(messageData) {
         if (this.sentMessageIds.has(messageData.id)) {
             console.log('🔄 Mensaje ya mostrado, ignorando duplicado');
@@ -177,6 +205,21 @@ initializeSocket() {
         
         this.hideTypingIndicator(messageData.username);
         this.displayMessage(messageData);
+        
+        // Si no es nuestro mensaje, enviar acuse de lectura
+        if (!isOwnMessage) {
+            this.sendReadReceipt(messageData.id);
+        }
+    }
+
+    sendReadReceipt(messageId) {
+        const receiptMessage = {
+            type: 'read-receipt',
+            messageId: messageId,
+            reader: this.username,
+            timestamp: new Date().toISOString()
+        };
+        this.socket.send(JSON.stringify(receiptMessage));
     }
 
     showTypingIndicator(username) {
@@ -256,7 +299,7 @@ initializeSocket() {
         reader.onload = (e) => {
             this.pendingImage = e.target.result;
             this.sendButton.textContent = '📷 Enviar Imagen';
-            this.sendButton.style.background = 'linear-gradient(135deg, #9b59b6, #8e44ad)';
+            this.sendButton.style.background = 'linear-gradient(135deg, #5e81ac, #81a1c1)';
         };
         reader.readAsDataURL(file);
     }
@@ -299,7 +342,7 @@ initializeSocket() {
             this.pendingImage = null;
             this.imageInput.value = '';
             this.sendButton.textContent = 'Enviar';
-            this.sendButton.style.background = 'linear-gradient(135deg, #3498db, #2980b9)';
+            this.sendButton.style.background = 'linear-gradient(135deg, #5e81ac, #81a1c1)';
             this.stopTyping();
         }
     }
@@ -314,6 +357,11 @@ initializeSocket() {
         const messageElement = document.createElement('div');
         messageElement.className = `message ${messageData.isOwn ? 'user' : 'other'}`;
         messageElement.dataset.messageId = messageData.id;
+        
+        // Agregar estado de lectura para mensajes propios
+        if (messageData.isOwn) {
+            messageElement.classList.add('pending-read');
+        }
         
         const hours = messageData.timestamp.getHours().toString().padStart(2, '0');
         const minutes = messageData.timestamp.getMinutes().toString().padStart(2, '0');
@@ -337,10 +385,79 @@ initializeSocket() {
         this.messagesContainer.appendChild(messageElement);
         this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
         
-        this.startMessageTimer(messageElement, messageData);
+        // Registrar mensaje pendiente si es nuestro
+        if (messageData.isOwn) {
+            this.pendingMessages.set(messageData.id, {
+                element: messageElement,
+                readBy: new Set(),
+                isOwn: true,
+                timestamp: Date.now()
+            });
+        } else {
+            // Para mensajes de otros, iniciar temporizador inmediatamente
+            this.startMessageTimer(messageElement, messageData);
+        }
+        
+        // Verificar si el mensaje es visible (lectura inmediata)
+        setTimeout(() => {
+            this.checkMessageVisibility(messageElement, messageData.id);
+        }, 100);
+    }
+
+    checkMessageVisibility(messageElement, messageId) {
+        const containerRect = this.messagesContainer.getBoundingClientRect();
+        const messageRect = messageElement.getBoundingClientRect();
+        
+        // Verificar si el mensaje está visible en el contenedor
+        if (messageRect.top >= containerRect.top && messageRect.bottom <= containerRect.bottom) {
+            // Mensaje visible, enviar acuse de lectura si no es nuestro
+            if (!messageElement.classList.contains('user')) {
+                this.sendReadReceipt(messageId);
+            }
+        }
+    }
+
+    checkVisibleMessages() {
+        // Verificar qué mensajes están actualmente visibles
+        const messages = this.messagesContainer.querySelectorAll('.message');
+        messages.forEach(messageElement => {
+            const messageId = messageElement.dataset.messageId;
+            if (messageId && !messageElement.classList.contains('user')) {
+                this.checkMessageVisibility(messageElement, messageId);
+            }
+        });
+    }
+
+    startMessageDeletionTimer(messageElement, messageId) {
+        // Iniciar temporizador de 5 segundos para eliminar mensaje propio leído
+        let timeLeft = 5;
+        
+        const interval = setInterval(() => {
+            timeLeft--;
+            
+            const timerElement = messageElement.querySelector('.message-timer');
+            if (timerElement) {
+                timerElement.textContent = `Desaparece en ${timeLeft}s`;
+            }
+            
+            if (timeLeft <= 0) {
+                clearInterval(interval);
+                messageElement.classList.add('fade-out');
+                
+                setTimeout(() => {
+                    if (messageElement.parentNode) {
+                        messageElement.parentNode.removeChild(messageElement);
+                        this.pendingMessages.delete(messageId);
+                    }
+                }, 500);
+            }
+        }, 1000);
+        
+        this.messageTimers.set(messageId, interval);
     }
 
     startMessageTimer(messageElement, messageData) {
+        // Temporizador para mensajes de otros usuarios
         let timeLeft = 5;
         
         const interval = setInterval(() => {
@@ -364,6 +481,20 @@ initializeSocket() {
         }, 1000);
         
         this.messageTimers.set(messageElement, interval);
+    }
+
+    clearAllPendingMessages() {
+        this.pendingMessages.forEach((messageInfo, messageId) => {
+            if (messageInfo.element && messageInfo.element.parentNode) {
+                messageInfo.element.parentNode.removeChild(messageInfo.element);
+            }
+        });
+        this.pendingMessages.clear();
+        
+        this.messageTimers.forEach(timer => {
+            clearInterval(timer);
+        });
+        this.messageTimers.clear();
     }
 
     updateConnectionStatus(connected) {

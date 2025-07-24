@@ -790,3 +790,57 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
+
+/* Indicador de mensaje pendiente de lectura */
+.message.pending-read {
+    border-left: 3px solid #ebcb8b;
+    position: relative;
+}
+
+.message.pending-read::after {
+    content: "↻";
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 0.8rem;
+    color: #ebcb8b;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Indicador de mensaje leído */
+.message.read {
+    border-left: 3px solid #a3be8c;
+}
+
+.message.read::after {
+    content: "✓";
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 0.8rem;
+    color: #a3be8c;
+}
+
+/* Ajustes responsivos para los indicadores */
+@media (max-width: 768px) {
+    .message.pending-read::after,
+    .message.read::after {
+        font-size: 0.7rem;
+        top: 3px;
+        right: 3px;
+    }
+}
+
+@media (min-width: 2000px) {
+    .message.pending-read::after,
+    .message.read::after {
+        font-size: 1.2rem;
+        top: 8px;
+        right: 8px;
+    }
+}

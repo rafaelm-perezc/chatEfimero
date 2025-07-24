@@ -50,6 +50,8 @@ wss.on('connection', (ws) => {
         console.log('📨 Mensaje recibido del cliente:', message.toString());
         
         try {
+            const messageData = JSON.parse(message.toString());
+            
             // Reenviar mensaje a todos los clientes conectados
             wss.clients.forEach((client) => {
                 if (client.readyState === WebSocket.OPEN) {
