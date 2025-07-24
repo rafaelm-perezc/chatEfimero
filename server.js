@@ -44,12 +44,12 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocket.Server({ server });
 
 // Almacenamiento de mensajes y usuarios
-const messages = []; // Almacenar todos los mensajes
-const connectedClients = new Set();
+let messages = []; // Almacenar todos los mensajes
+const connectedClients = new Map(); // userId -> WebSocket
 
 wss.on('connection', (ws) => {
     console.log('🟢 Nuevo cliente conectado');
-    connectedClients.add(ws);
+    let userId = null;
     
     ws.on('message', (message) => {
         console.log('📨 Mensaje recibido del cliente:', message.toString());
@@ -58,6 +58,17 @@ wss.on('connection', (ws) => {
             const messageData = JSON.parse(message.toString());
             
             switch (messageData.type) {
+                case 'user-info':
+                    userId = messageData.userId;
+                    connectedClients.set(userId, ws);
+                    
+                    // Enviar confirmación
+                    ws.send(JSON.stringify({
+                        type: 'user-info-ack',
+                        timestamp: new Date().toISOString()
+                    }));
+                    break;
+                    
                 case 'request-historical':
                     // Enviar mensajes históricos al nuevo cliente
                     ws.send(JSON.stringify({
@@ -66,20 +77,25 @@ wss.on('connection', (ws) => {
                     }));
                     break;
                     
-                case 'user-info':
-                    // No necesitamos hacer nada especial
-                    break;
-                    
                 case 'typing':
                 case 'stop-typing':
-                case 'read-receipt':
                     // Reenviar estos mensajes a todos los clientes
+                    broadcastMessage(message.toString(), ws);
+                    break;
+                    
+                case 'read-receipt':
+                    // Procesar acuse de lectura
+                    processReadReceipt(messageData);
+                    // Reenviar a todos
                     broadcastMessage(message.toString(), ws);
                     break;
                     
                 case 'text':
                 case 'image':
-                    // Almacenar mensaje y reenviar
+                    // Almacenar mensaje con información de lectura
+                    if (!messageData.readBy) {
+                        messageData.readBy = [];
+                    }
                     messages.push(messageData);
                     broadcastMessage(message.toString(), ws);
                     break;
@@ -95,20 +111,39 @@ wss.on('connection', (ws) => {
     
     ws.on('close', () => {
         console.log('🔴 Cliente desconectado');
-        connectedClients.delete(ws);
+        if (userId) {
+            connectedClients.delete(userId);
+        }
     });
     
     ws.on('error', (error) => {
         console.error('❌ Error en conexión WebSocket:', error);
-        connectedClients.delete(ws);
+        if (userId) {
+            connectedClients.delete(userId);
+        }
     });
 });
 
+function processReadReceipt(receiptData) {
+    // Actualizar mensaje con información de lectura
+    const message = messages.find(msg => msg.id === receiptData.messageId);
+    if (message) {
+        // Verificar que el lector no sea el mismo autor
+        if (message.userId !== receiptData.readerId) {
+            // Agregar lector si no está ya en la lista
+            if (!message.readBy.includes(receiptData.readerId)) {
+                message.readBy.push(receiptData.readerId);
+                console.log(`✅ Mensaje ${receiptData.messageId} leído por ${receiptData.readerId}`);
+            }
+        }
+    }
+}
+
 function broadcastMessage(message, sender) {
-    connectedClients.forEach((client) => {
+    connectedClients.forEach((client, userId) => {
         if (client !== sender && client.readyState === WebSocket.OPEN) {
             client.send(message);
-            console.log('📤 Mensaje reenviado a cliente');
+            console.log(`📤 Mensaje reenviado a cliente ${userId}`);
         }
     });
 }

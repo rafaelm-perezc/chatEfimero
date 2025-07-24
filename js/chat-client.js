@@ -10,9 +10,9 @@ class ChatClient {
         this.typingTimeout = null;
         this.isTyping = false;
         this.typingIndicators = new Map();
-        this.pendingMessages = new Map();
-        this.observedMessages = new Set();
-        this.receivedMessages = new Set(); // Para rastrear mensajes ya recibidos
+        this.pendingMessages = new Map(); // Solo para mensajes que enviamos
+        this.observedMessages = new Set(); // Mensajes que hemos visto
+        this.displayedMessages = new Set(); // Mensajes ya mostrados
         
         this.initializeElements();
         this.initializeSocket();
@@ -21,15 +21,15 @@ class ChatClient {
     }
 
     getUserId() {
-        // Generar ID basado en timestamp y datos del navegador para mayor consistencia
+        // Generar ID consistente basado en características del navegador
         const navigatorInfo = navigator.userAgent + navigator.language + screen.width + screen.height;
-        const idBase = btoa(navigatorInfo).substring(0, 20);
-        return 'user-' + idBase + '-' + Date.now();
+        const idHash = btoa(navigatorInfo).replace(/[^a-zA-Z0-9]/g, '').substring(0, 15);
+        return 'user-' + idHash;
     }
 
     generateUsername() {
         // Intentar obtener username guardado
-        const savedUsername = localStorage.getItem('chat-username');
+        const savedUsername = localStorage.getItem('chat-username-' + this.getUserId());
         if (savedUsername) {
             return savedUsername;
         }
@@ -41,7 +41,7 @@ class ChatClient {
         const num = Math.floor(Math.random() * 1000);
         const username = `${adj}${noun}${num}`;
         
-        localStorage.setItem('chat-username', username);
+        localStorage.setItem('chat-username-' + this.getUserId(), username);
         return username;
     }
 
@@ -74,7 +74,7 @@ class ChatClient {
                     const messageId = entry.target.dataset.messageId;
                     const messageUserId = entry.target.dataset.userId;
                     
-                    // Solo enviar acuse de lectura para mensajes que no son nuestros
+                    // Solo enviar acuse de lectura para mensajes de otros usuarios
                     if (messageId && messageUserId !== this.userId && !this.observedMessages.has(messageId)) {
                         this.observedMessages.add(messageId);
                         this.sendReadReceipt(messageId);
@@ -106,8 +106,8 @@ class ChatClient {
                 const messageData = JSON.parse(event.data);
                 
                 switch (messageData.type) {
-                    case 'user-info':
-                        // No necesitamos hacer nada especial aquí
+                    case 'user-info-ack':
+                        // Confirmación de conexión
                         break;
                     case 'typing':
                         this.handleTypingMessage(messageData);
@@ -176,10 +176,25 @@ class ChatClient {
         // Mostrar mensajes históricos
         if (messageData.messages && Array.isArray(messageData.messages)) {
             messageData.messages.forEach(msg => {
-                // Evitar duplicados
-                if (!this.receivedMessages.has(msg.id)) {
-                    this.receivedMessages.add(msg.id);
-                    this.displayMessage(msg);
+                // No mostrar mensajes duplicados
+                if (!this.displayedMessages.has(msg.id)) {
+                    this.displayedMessages.add(msg.id);
+                    const isOwnMessage = msg.userId === this.userId;
+                    this.displayMessage({...msg, isOwn: isOwnMessage});
+                    
+                    // Si es nuestro mensaje y ya fue leído, iniciar temporizador
+                    if (isOwnMessage && msg.readBy && msg.readBy.length > 0) {
+                        // Verificar si fue leído por otro usuario (no por nosotros)
+                        const readByOther = msg.readBy.some(readerId => readerId !== this.userId);
+                        if (readByOther) {
+                            const element = document.querySelector(`[data-message-id="${msg.id}"]`);
+                            if (element) {
+                                element.classList.remove('pending-read');
+                                element.classList.add('read');
+                                this.startMessageDeletionTimer(element, msg.id);
+                            }
+                        }
+                    }
                 }
             });
         }
@@ -275,7 +290,6 @@ class ChatClient {
         
         if (this.pendingMessages.has(receiptData.messageId)) {
             const messageInfo = this.pendingMessages.get(receiptData.messageId);
-            messageInfo.read = true;
             
             if (messageInfo.element) {
                 messageInfo.element.classList.remove('pending-read');
@@ -283,19 +297,17 @@ class ChatClient {
             }
             
             // Iniciar temporizador de eliminación para mensajes propios leídos
-            if (messageInfo.isOwn) {
-                this.startMessageDeletionTimer(messageInfo.element, receiptData.messageId);
-            }
+            this.startMessageDeletionTimer(messageInfo.element, receiptData.messageId);
         }
     }
 
     handleNewMessage(messageData) {
-        // Evitar duplicados
-        if (this.receivedMessages.has(messageData.id)) {
+        // Evitar mostrar mensajes duplicados
+        if (this.displayedMessages.has(messageData.id)) {
             return;
         }
         
-        this.receivedMessages.add(messageData.id);
+        this.displayedMessages.add(messageData.id);
         const isOwnMessage = messageData.userId === this.userId;
         messageData.isOwn = isOwnMessage;
         
@@ -397,7 +409,8 @@ class ChatClient {
                 username: this.username,
                 content: textMessage,
                 timestamp: new Date().toISOString(),
-                type: 'text'
+                type: 'text',
+                readBy: [] // Inicialmente no leído por nadie
             };
             
             console.log('📤 Enviando mensaje de texto:', messageData);
@@ -416,7 +429,8 @@ class ChatClient {
                 username: this.username,
                 content: this.pendingImage,
                 timestamp: new Date().toISOString(),
-                type: 'image'
+                type: 'image',
+                readBy: [] // Inicialmente no leído por nadie
             };
             
             console.log('📤 Enviando imagen:', messageData.id);
@@ -447,6 +461,11 @@ class ChatClient {
         // Agregar estado de lectura para mensajes propios
         if (messageData.isOwn) {
             messageElement.classList.add('pending-read');
+        } else {
+            // Para mensajes de otros, agregar clase 'read' si ya fueron leídos
+            if (messageData.readBy && messageData.readBy.includes(this.userId)) {
+                messageElement.classList.add('read');
+            }
         }
         
         const hours = messageData.timestamp.getHours().toString().padStart(2, '0');
@@ -475,13 +494,13 @@ class ChatClient {
         if (messageData.isOwn) {
             this.pendingMessages.set(messageData.id, {
                 element: messageElement,
-                read: false,
-                isOwn: true,
                 timestamp: Date.now()
             });
         } else {
-            // Para mensajes de otros, iniciar temporizador inmediatamente
-            this.startMessageTimer(messageElement, messageData);
+            // Para mensajes de otros, iniciar temporizador inmediatamente si ya fueron leídos
+            if (messageData.readBy && messageData.readBy.includes(this.userId)) {
+                this.startMessageTimer(messageElement, messageData);
+            }
         }
         
         // Observar este mensaje para detectar cuando entra en la vista
