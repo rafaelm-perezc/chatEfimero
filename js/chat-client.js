@@ -33,18 +33,20 @@ class ChatClient {
         return `${adj}${noun}${num}`;
     }
 
-    initializeSocket() {
-        const serverIP = window.location.hostname;
-        const serverPort = 3000;
-        
-        try {
-            this.socket = new WebSocket(`ws://${serverIP}:${serverPort}`);
-            this.setupWebSocketEvents();
-        } catch (error) {
-            console.error('Error al conectar al WebSocket:', error);
-            this.updateConnectionStatus(false);
-        }
+    // En la función initializeSocket(), reemplaza la parte de conexión:
+initializeSocket() {
+    // Detectar automáticamente el protocolo y host
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    
+    try {
+        this.socket = new WebSocket(`${protocol}//${host}`);
+        this.setupWebSocketEvents();
+    } catch (error) {
+        console.error('Error al conectar al WebSocket:', error);
+        this.updateConnectionStatus(false);
     }
+}
 
     setupWebSocketEvents() {
         this.socket.onopen = () => {
