@@ -341,7 +341,7 @@ initializeSocket() {
     }
 
     startMessageTimer(messageElement, messageData) {
-        let timeLeft = 15;
+        let timeLeft = 5;
         
         const interval = setInterval(() => {
             timeLeft--;
