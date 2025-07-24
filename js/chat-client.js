@@ -11,10 +11,12 @@ class ChatClient {
         this.typingIndicators = new Map();
         this.pendingMessages = new Map(); // Para mensajes enviados por este usuario
         this.readReceipts = new Map(); // Para rastrear lecturas
+        this.observedMessages = new Set(); // Para rastrear mensajes observados
         
         this.initializeElements();
         this.initializeSocket();
         this.setupEventListeners();
+        this.setupIntersectionObserver();
     }
 
     initializeElements() {
@@ -46,6 +48,29 @@ class ChatClient {
             console.error('Error al conectar al WebSocket:', error);
             this.updateConnectionStatus(false);
         }
+    }
+
+    setupIntersectionObserver() {
+        // Crear Intersection Observer para detectar cuando mensajes entran en la vista
+        this.intersectionObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const messageId = entry.target.dataset.messageId;
+                    const isOwnMessage = entry.target.classList.contains('user');
+                    
+                    // Solo enviar acuse de lectura para mensajes de otros usuarios
+                    if (messageId && !isOwnMessage && !this.observedMessages.has(messageId)) {
+                        this.observedMessages.add(messageId);
+                        this.sendReadReceipt(messageId);
+                        
+                        // Agregar clase visual de lectura
+                        entry.target.classList.add('read');
+                    }
+                }
+            });
+        }, {
+            threshold: 0.5 // 50% del mensaje debe estar visible
+        });
     }
 
     setupWebSocketEvents() {
@@ -125,9 +150,23 @@ class ChatClient {
             this.stopTyping();
         });
         
-        // Detectar cuando los mensajes entran en la vista (lectura)
-        this.messagesContainer.addEventListener('scroll', () => {
-            this.checkVisibleMessages();
+        // Observar cambios en el contenedor de mensajes
+        const observer = new MutationObserver(() => {
+            this.observeNewMessages();
+        });
+        
+        observer.observe(this.messagesContainer, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    observeNewMessages() {
+        // Observar nuevos mensajes que se agregan al contenedor
+        const messages = this.messagesContainer.querySelectorAll('.message:not([data-observed])');
+        messages.forEach(message => {
+            message.setAttribute('data-observed', 'true');
+            this.intersectionObserver.observe(message);
         });
     }
 
@@ -205,11 +244,6 @@ class ChatClient {
         
         this.hideTypingIndicator(messageData.username);
         this.displayMessage(messageData);
-        
-        // Si no es nuestro mensaje, enviar acuse de lectura
-        if (!isOwnMessage) {
-            this.sendReadReceipt(messageData.id);
-        }
     }
 
     sendReadReceipt(messageId) {
@@ -398,34 +432,10 @@ class ChatClient {
             this.startMessageTimer(messageElement, messageData);
         }
         
-        // Verificar si el mensaje es visible (lectura inmediata)
+        // Observar este mensaje para detectar cuando entra en la vista
         setTimeout(() => {
-            this.checkMessageVisibility(messageElement, messageData.id);
+            this.observeNewMessages();
         }, 100);
-    }
-
-    checkMessageVisibility(messageElement, messageId) {
-        const containerRect = this.messagesContainer.getBoundingClientRect();
-        const messageRect = messageElement.getBoundingClientRect();
-        
-        // Verificar si el mensaje está visible en el contenedor
-        if (messageRect.top >= containerRect.top && messageRect.bottom <= containerRect.bottom) {
-            // Mensaje visible, enviar acuse de lectura si no es nuestro
-            if (!messageElement.classList.contains('user')) {
-                this.sendReadReceipt(messageId);
-            }
-        }
-    }
-
-    checkVisibleMessages() {
-        // Verificar qué mensajes están actualmente visibles
-        const messages = this.messagesContainer.querySelectorAll('.message');
-        messages.forEach(messageElement => {
-            const messageId = messageElement.dataset.messageId;
-            if (messageId && !messageElement.classList.contains('user')) {
-                this.checkMessageVisibility(messageElement, messageId);
-            }
-        });
     }
 
     startMessageDeletionTimer(messageElement, messageId) {
@@ -457,7 +467,7 @@ class ChatClient {
     }
 
     startMessageTimer(messageElement, messageData) {
-        // Temporizador para mensajes de otros usuarios
+        // Temporizador para mensajes de otros usuarios (5 segundos después de ser visibles)
         let timeLeft = 5;
         
         const interval = setInterval(() => {
@@ -495,6 +505,8 @@ class ChatClient {
             clearInterval(timer);
         });
         this.messageTimers.clear();
+        
+        this.observedMessages.clear();
     }
 
     updateConnectionStatus(connected) {
