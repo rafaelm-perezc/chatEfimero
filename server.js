@@ -43,7 +43,7 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocket.Server({ server });
 
-// Almacenamiento de mensajes y usuarios
+// Almacenamiento de mensajes
 let messages = []; // Almacenar todos los mensajes
 const connectedClients = new Map(); // userId -> WebSocket
 
@@ -86,17 +86,16 @@ wss.on('connection', (ws) => {
                 case 'read-receipt':
                     // Procesar acuse de lectura
                     processReadReceipt(messageData);
+                    console.log('✅ Procesando acuse de lectura:', messageData);
                     // Reenviar a todos
                     broadcastMessage(message.toString(), ws);
                     break;
                     
                 case 'text':
                 case 'image':
-                    // Almacenar mensaje con información de lectura
-                    if (!messageData.readBy) {
-                        messageData.readBy = [];
-                    }
+                    // Almacenar mensaje
                     messages.push(messageData);
+                    console.log('💾 Mensaje almacenado:', messageData.id);
                     broadcastMessage(message.toString(), ws);
                     break;
                     
@@ -125,18 +124,9 @@ wss.on('connection', (ws) => {
 });
 
 function processReadReceipt(receiptData) {
-    // Actualizar mensaje con información de lectura
-    const message = messages.find(msg => msg.id === receiptData.messageId);
-    if (message) {
-        // Verificar que el lector no sea el mismo autor
-        if (message.userId !== receiptData.readerId) {
-            // Agregar lector si no está ya en la lista
-            if (!message.readBy.includes(receiptData.readerId)) {
-                message.readBy.push(receiptData.readerId);
-                console.log(`✅ Mensaje ${receiptData.messageId} leído por ${receiptData.readerId}`);
-            }
-        }
-    }
+    // En este sistema simple, solo reenviamos el acuse de lectura
+    // El cliente que envió el mensaje lo procesará
+    console.log(`✅ Mensaje ${receiptData.messageId} leído por ${receiptData.readerId}`);
 }
 
 function broadcastMessage(message, sender) {
