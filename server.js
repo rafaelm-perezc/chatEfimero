@@ -43,24 +43,34 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocket.Server({ server });
 
-// Almacenamiento simple de mensajes
-let messages = [];
+// Almacenamiento de mensajes y usuarios
+let messages = []; // Almacenar todos los mensajes
+const connectedClients = new Map(); // userId -> WebSocket
 
 wss.on('connection', (ws) => {
     console.log('🟢 Nuevo cliente conectado');
+    let userId = null;
     
     ws.on('message', (message) => {
+        console.log('📨 Mensaje recibido del cliente:', message.toString());
+        
         try {
             const messageData = JSON.parse(message.toString());
             
             switch (messageData.type) {
                 case 'user-info':
+                    userId = messageData.userId;
+                    connectedClients.set(userId, ws);
+                    
+                    // Enviar confirmación
                     ws.send(JSON.stringify({
-                        type: 'user-info-ack'
+                        type: 'user-info-ack',
+                        timestamp: new Date().toISOString()
                     }));
                     break;
                     
                 case 'request-historical':
+                    // Enviar mensajes históricos al nuevo cliente
                     ws.send(JSON.stringify({
                         type: 'historical-messages',
                         messages: messages
@@ -69,48 +79,77 @@ wss.on('connection', (ws) => {
                     
                 case 'typing':
                 case 'stop-typing':
-                    // Broadcast a todos
-                    wss.clients.forEach((client) => {
-                        if (client.readyState === WebSocket.OPEN) {
-                            client.send(message);
-                        }
-                    });
+                    // Reenviar estos mensajes a todos los clientes
+                    broadcastMessage(message.toString(), ws);
                     break;
                     
                 case 'read-receipt':
-                    console.log('📬 Acuse de lectura:', messageData.messageId, 'por', messageData.readerId);
-                    // Broadcast a todos
-                    wss.clients.forEach((client) => {
-                        if (client.readyState === WebSocket.OPEN) {
-                            client.send(message);
-                        }
-                    });
+                    // Procesar acuse de lectura
+                    processReadReceipt(messageData);
+                    // Reenviar a todos
+                    broadcastMessage(message.toString(), ws);
                     break;
                     
                 case 'text':
                 case 'image':
-                    // Guardar y broadcast
+                    // Almacenar mensaje con información de lectura
+                    if (!messageData.readBy) {
+                        messageData.readBy = [];
+                    }
                     messages.push(messageData);
-                    console.log('💾 Mensaje guardado:', messageData.id);
-                    
-                    wss.clients.forEach((client) => {
-                        if (client.readyState === WebSocket.OPEN) {
-                            client.send(message);
-                        }
-                    });
+                    broadcastMessage(message.toString(), ws);
                     break;
+                    
+                default:
+                    // Reenviar cualquier otro mensaje
+                    broadcastMessage(message.toString(), ws);
             }
         } catch (error) {
-            console.error('❌ Error:', error);
+            console.error('❌ Error al procesar mensaje:', error);
         }
     });
     
     ws.on('close', () => {
         console.log('🔴 Cliente desconectado');
+        if (userId) {
+            connectedClients.delete(userId);
+        }
+    });
+    
+    ws.on('error', (error) => {
+        console.error('❌ Error en conexión WebSocket:', error);
+        if (userId) {
+            connectedClients.delete(userId);
+        }
     });
 });
 
+function processReadReceipt(receiptData) {
+    // Actualizar mensaje con información de lectura
+    const message = messages.find(msg => msg.id === receiptData.messageId);
+    if (message) {
+        // Verificar que el lector no sea el mismo autor
+        if (message.userId !== receiptData.readerId) {
+            // Agregar lector si no está ya en la lista
+            if (!message.readBy.includes(receiptData.readerId)) {
+                message.readBy.push(receiptData.readerId);
+                console.log(`✅ Mensaje ${receiptData.messageId} leído por ${receiptData.readerId}`);
+            }
+        }
+    }
+}
+
+function broadcastMessage(message, sender) {
+    connectedClients.forEach((client, userId) => {
+        if (client !== sender && client.readyState === WebSocket.OPEN) {
+            client.send(message);
+            console.log(`📤 Mensaje reenviado a cliente ${userId}`);
+        }
+    });
+}
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor en http://0.0.0.0:${PORT}`);
+    console.log(`🚀 Servidor corriendo en http://0.0.0.0:${PORT}`);
+    console.log('📡 Servidor WebSocket escuchando en el mismo puerto');
 });
