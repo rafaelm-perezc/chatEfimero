@@ -4,9 +4,9 @@ class ChatClient {
         this.socket = null;
         this.isConnected = false;
         this.messageTimers = new Map();
-        this.sentMessageIds = new Set(); // Para evitar duplicados
-        this.pendingImage = null; // Para almacenar imagen pendiente de envío
-        
+        this.sentMessageIds = new Set();
+        this.pendingImage = null;
+
         this.initializeElements();
         this.initializeSocket();
         this.setupEventListeners();
@@ -31,10 +31,9 @@ class ChatClient {
     }
 
     initializeSocket() {
-        // Conectar al servidor WebSocket
         const serverIP = window.location.hostname;
         const serverPort = 3000;
-        
+
         try {
             this.socket = new WebSocket(`ws://${serverIP}:${serverPort}`);
             this.setupWebSocketEvents();
@@ -54,40 +53,38 @@ class ChatClient {
 
         this.socket.onmessage = (event) => {
             try {
-                console.log('📥 Mensaje recibido del servidor:', event.data);
                 const messageData = JSON.parse(event.data);
-                
-                // Verificar si ya mostramos este mensaje (para evitar duplicados)
                 if (this.sentMessageIds.has(messageData.id)) {
-                    console.log('🔄 Mensaje ya mostrado, ignorando duplicado');
-                    this.sentMessageIds.delete(messageData.id); // Limpiar el ID
+                    this.sentMessageIds.delete(messageData.id);
                     return;
                 }
-                
-                // Determinar si es un mensaje propio
+
                 const isOwnMessage = messageData.username === this.username;
                 messageData.isOwn = isOwnMessage;
-                
+
                 this.displayMessage(messageData);
+
+                if (!isOwnMessage && this.isConnected) {
+                    this.socket.send(JSON.stringify({
+                        type: 'read-confirmation',
+                        id: messageData.id
+                    }));
+                }
             } catch (error) {
                 console.error('❌ Error al procesar mensaje:', error);
             }
         };
 
         this.socket.onclose = () => {
-            console.log('🔌 Desconectado del servidor WebSocket');
             this.isConnected = false;
             this.updateConnectionStatus(false);
             this.disableInputs();
-            
-            // Intentar reconectar después de 3 segundos
             setTimeout(() => {
                 this.initializeSocket();
             }, 3000);
         };
 
         this.socket.onerror = (error) => {
-            console.error('❌ Error de WebSocket:', error);
             this.isConnected = false;
             this.updateConnectionStatus(false);
             this.disableInputs();
@@ -99,8 +96,7 @@ class ChatClient {
             e.preventDefault();
             this.sendMessage();
         });
-        
-        // Evento para seleccionar imagen
+
         this.imageInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -109,138 +105,65 @@ class ChatClient {
         });
     }
 
-    handleImageSelection(file) {
-        // Validar que sea una imagen
-        if (!file.type.startsWith('image/')) {
-            alert('Por favor selecciona solo archivos de imagen');
-            this.imageInput.value = '';
-            return;
-        }
-        
-        // Validar tamaño (máximo 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            alert('La imagen es muy grande. Máximo 5MB');
-            this.imageInput.value = '';
-            return;
-        }
-        
-        // Convertir imagen a base64
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            this.pendingImage = e.target.result;
-            this.sendButton.textContent = '📷 Enviar Imagen';
-            this.sendButton.style.background = 'linear-gradient(135deg, #9b59b6, #8e44ad)';
-        };
-        reader.readAsDataURL(file);
-    }
-
     sendMessage() {
         const textMessage = this.messageInput.value.trim();
-        
-        // Enviar mensaje de texto
         if (textMessage && this.isConnected) {
             const messageData = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9), // ID único
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 username: this.username,
                 content: textMessage,
                 timestamp: new Date().toISOString(),
                 type: 'text'
             };
-            
-            console.log('📤 Enviando mensaje de texto:', messageData);
-            
-            // Registrar que enviamos este mensaje
+
             this.sentMessageIds.add(messageData.id);
-            
-            // Enviar mensaje al servidor
             this.socket.send(JSON.stringify(messageData));
-            
-            // Mostrar mensaje localmente (con isOwn=true)
-            this.displayMessage({...messageData, isOwn: true});
             this.messageInput.value = '';
-        }
-        
-        // Enviar imagen
-        if (this.pendingImage && this.isConnected) {
-            const messageData = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9), // ID único
-                username: this.username,
-                content: this.pendingImage,
-                timestamp: new Date().toISOString(),
-                type: 'image'
-            };
-            
-            console.log('📤 Enviando imagen:', messageData.id);
-            
-            // Registrar que enviamos esta imagen
-            this.sentMessageIds.add(messageData.id);
-            
-            // Enviar imagen al servidor
-            this.socket.send(JSON.stringify(messageData));
-            
-            // Mostrar imagen localmente (con isOwn=true)
-            this.displayMessage({...messageData, isOwn: true});
-            this.pendingImage = null;
-            this.imageInput.value = '';
-            this.sendButton.textContent = 'Enviar';
-            this.sendButton.style.background = 'linear-gradient(135deg, #3498db, #2980b9)';
         }
     }
 
     displayMessage(messageData) {
-        console.log('👁️ Mostrando mensaje:', messageData);
-        
-        // Convertir timestamp a objeto Date si es string
-        if (typeof messageData.timestamp === 'string') {
-            messageData.timestamp = new Date(messageData.timestamp);
-        }
-        
         const messageElement = document.createElement('div');
         messageElement.className = `message ${messageData.isOwn ? 'user' : 'other'}`;
         messageElement.dataset.messageId = messageData.id;
-        
-        const hours = messageData.timestamp.getHours().toString().padStart(2, '0');
-        const minutes = messageData.timestamp.getMinutes().toString().padStart(2, '0');
-        
+
+        const timestamp = new Date(messageData.timestamp);
+        const hours = timestamp.getHours().toString().padStart(2, '0');
+        const minutes = timestamp.getMinutes().toString().padStart(2, '0');
+
         let contentHTML = '';
         if (messageData.type === 'image') {
-            contentHTML = `<img src="${this.escapeHtml(messageData.content)}" alt="Imagen" class="message-image">`;
+            contentHTML = `<img src="${messageData.content}" alt="Imagen" class="message-image">`;
         } else {
-            contentHTML = `<div class="message-content">${this.escapeHtml(messageData.content)}</div>`;
+            contentHTML = `<div class="message-content">${messageData.content}</div>`;
         }
-        
+
         messageElement.innerHTML = `
             <div class="message-header">
-                <span class="username">${this.escapeHtml(messageData.username)}</span>
+                <span class="username">${messageData.username}</span>
                 <span class="timestamp">${hours}:${minutes}</span>
             </div>
             ${contentHTML}
             <div class="message-timer">Desaparece en 5s</div>
         `;
-        
+
         this.messagesContainer.appendChild(messageElement);
         this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-        
-        // Iniciar temporizador para eliminar el mensaje (5 segundos después de recibirlo)
-        this.startMessageTimer(messageElement, messageData);
+
+        this.startMessageTimer(messageElement);
     }
 
-    startMessageTimer(messageElement, messageData) {
+    startMessageTimer(messageElement) {
         let timeLeft = 5;
-        
         const interval = setInterval(() => {
             timeLeft--;
-            
-            // Actualizar contador visual
             const timerElement = messageElement.querySelector('.message-timer');
             if (timerElement) {
                 timerElement.textContent = `Desaparece en ${timeLeft}s`;
             }
-            
             if (timeLeft <= 0) {
                 clearInterval(interval);
                 messageElement.classList.add('fade-out');
-                
                 setTimeout(() => {
                     if (messageElement.parentNode) {
                         messageElement.parentNode.removeChild(messageElement);
@@ -248,9 +171,6 @@ class ChatClient {
                 }, 500);
             }
         }, 1000);
-        
-        // Guardar referencia al intervalo
-        this.messageTimers.set(messageElement, interval);
     }
 
     updateConnectionStatus(connected) {
@@ -273,11 +193,5 @@ class ChatClient {
         this.messageInput.disabled = true;
         this.sendButton.disabled = true;
         this.imageInput.disabled = true;
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 }
