@@ -1,15 +1,19 @@
+// server.js
 const WebSocket = require('ws');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Servidor HTTP para servir archivos estáticos
 const server = http.createServer((req, res) => {
     let filePath = '.' + req.url;
     
+    // Si es la raíz, servir index.html
     if (filePath === './') {
         filePath = './index.html';
     }
     
+    // Determinar el tipo de contenido
     const extname = String(path.extname(filePath)).toLowerCase();
     const mimeTypes = {
         '.html': 'text/html',
@@ -26,30 +30,29 @@ const server = http.createServer((req, res) => {
     fs.readFile(filePath, (error, content) => {
         if (error) {
             if(error.code == 'ENOENT') {
+                // Archivo no encontrado
                 fs.readFile('./index.html', (err, content) => {
                     res.writeHead(200, { 'Content-Type': 'text/html' });
                     res.end(content, 'utf-8');
                 });
             } else {
+                // Error del servidor
                 res.writeHead(500);
                 res.end('Sorry, check with the site admin for error: '+error.code+' ..\n');
             }
         } else {
+            // Éxito
             res.writeHead(200, { 'Content-Type': contentType });
             res.end(content, 'utf-8');
         }
     });
 });
 
+// Servidor WebSocket
 const wss = new WebSocket.Server({ server });
-
-// Almacenamiento de mensajes y usuarios
-let messages = []; // Almacenar todos los mensajes
-const connectedClients = new Map(); // userId -> WebSocket
 
 wss.on('connection', (ws) => {
     console.log('🟢 Nuevo cliente conectado');
-    let userId = null;
     
     ws.on('message', (message) => {
         console.log('📨 Mensaje recibido del cliente:', message.toString());
@@ -57,53 +60,13 @@ wss.on('connection', (ws) => {
         try {
             const messageData = JSON.parse(message.toString());
             
-            switch (messageData.type) {
-                case 'user-info':
-                    userId = messageData.userId;
-                    connectedClients.set(userId, ws);
-                    
-                    // Enviar confirmación
-                    ws.send(JSON.stringify({
-                        type: 'user-info-ack',
-                        timestamp: new Date().toISOString()
-                    }));
-                    break;
-                    
-                case 'request-historical':
-                    // Enviar mensajes históricos al nuevo cliente
-                    ws.send(JSON.stringify({
-                        type: 'historical-messages',
-                        messages: messages
-                    }));
-                    break;
-                    
-                case 'typing':
-                case 'stop-typing':
-                    // Reenviar estos mensajes a todos los clientes
-                    broadcastMessage(message.toString(), ws);
-                    break;
-                    
-                case 'read-receipt':
-                    // Procesar acuse de lectura
-                    processReadReceipt(messageData);
-                    // Reenviar a todos
-                    broadcastMessage(message.toString(), ws);
-                    break;
-                    
-                case 'text':
-                case 'image':
-                    // Almacenar mensaje con información de lectura
-                    if (!messageData.readBy) {
-                        messageData.readBy = [];
-                    }
-                    messages.push(messageData);
-                    broadcastMessage(message.toString(), ws);
-                    break;
-                    
-                default:
-                    // Reenviar cualquier otro mensaje
-                    broadcastMessage(message.toString(), ws);
-            }
+            // Reenviar mensaje a todos los clientes conectados (incluyendo el remitente)
+            wss.clients.forEach((client) => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(messageData));
+                    console.log('📤 Mensaje reenviado a cliente');
+                }
+            });
         } catch (error) {
             console.error('❌ Error al procesar mensaje:', error);
         }
@@ -111,42 +74,12 @@ wss.on('connection', (ws) => {
     
     ws.on('close', () => {
         console.log('🔴 Cliente desconectado');
-        if (userId) {
-            connectedClients.delete(userId);
-        }
     });
     
     ws.on('error', (error) => {
         console.error('❌ Error en conexión WebSocket:', error);
-        if (userId) {
-            connectedClients.delete(userId);
-        }
     });
 });
-
-function processReadReceipt(receiptData) {
-    // Actualizar mensaje con información de lectura
-    const message = messages.find(msg => msg.id === receiptData.messageId);
-    if (message) {
-        // Verificar que el lector no sea el mismo autor
-        if (message.userId !== receiptData.readerId) {
-            // Agregar lector si no está ya en la lista
-            if (!message.readBy.includes(receiptData.readerId)) {
-                message.readBy.push(receiptData.readerId);
-                console.log(`✅ Mensaje ${receiptData.messageId} leído por ${receiptData.readerId}`);
-            }
-        }
-    }
-}
-
-function broadcastMessage(message, sender) {
-    connectedClients.forEach((client, userId) => {
-        if (client !== sender && client.readyState === WebSocket.OPEN) {
-            client.send(message);
-            console.log(`📤 Mensaje reenviado a cliente ${userId}`);
-        }
-    });
-}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {

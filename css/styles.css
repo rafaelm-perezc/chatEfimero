@@ -2,11 +2,11 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Inter', 'SF Pro Display', 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 body {
-    background: linear-gradient(135deg, #2e3440, #3b4252, #434c5e);
+    background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
     min-height: 100vh;
     display: flex;
     justify-content: center;
@@ -18,67 +18,63 @@ body {
     width: 100%;
     max-width: 100%;
     height: 95vh;
-    background: rgba(46, 52, 64, 0.95);
-    backdrop-filter: blur(12px);
-    border-radius: 16px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
     overflow: hidden;
-    border: 1px solid rgba(129, 161, 193, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     flex-direction: column;
 }
 
 .header {
-    background: rgba(59, 66, 82, 0.8);
+    background: rgba(0, 0, 0, 0.3);
     padding: 15px;
     text-align: center;
-    border-bottom: 1px solid rgba(129, 161, 193, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     flex-shrink: 0;
 }
 
 .header h1 {
-    color: #88c0d0;
+    color: white;
     font-size: 1.5rem;
     margin-bottom: 5px;
-    font-weight: 600;
-    letter-spacing: -0.5px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .header p {
-    color: #d8dee9;
+    color: rgba(255, 255, 255, 0.8);
     font-size: 0.8rem;
     margin: 0 auto;
-    opacity: 0.8;
 }
 
 .connection-status {
     padding: 10px;
     text-align: center;
     font-size: 0.9rem;
-    color: #d8dee9;
-    background: rgba(67, 76, 94, 0.6);
-    border-bottom: 1px solid rgba(129, 161, 193, 0.2);
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     flex-shrink: 0;
 }
 
 .status-connected {
-    background: rgba(163, 190, 140, 0.2);
-    color: #a3be8c;
+    background: rgba(46, 204, 113, 0.2);
 }
 
 .status-disconnected {
-    background: rgba(191, 97, 106, 0.2);
-    color: #bf616a;
+    background: rgba(231, 76, 60, 0.2);
 }
 
-/* Íconos Nórdicos */
+/* Íconos CSS */
 .spinner {
     display: inline-block;
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(136, 192, 208, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
-    border-top-color: #88c0d0;
+    border-top-color: white;
     animation: spin 1s ease-in-out infinite;
     margin-right: 6px;
     vertical-align: middle;
@@ -93,7 +89,7 @@ body {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background-color: #a3be8c;
+    background-color: #2ecc71;
     margin-right: 6px;
     vertical-align: middle;
 }
@@ -101,7 +97,7 @@ body {
 .chat-container {
     display: flex;
     flex: 1;
-    min-height: 0;
+    min-height: 0; /* Importante para flexbox en dispositivos móviles */
 }
 
 .messages-area {
@@ -119,90 +115,83 @@ body {
     flex-direction: column;
     gap: 12px;
     min-height: 0;
-    background: rgba(59, 66, 82, 0.3);
 }
 
 .message {
     max-width: 80%;
-    padding: 14px;
-    border-radius: 12px;
+    padding: 12px;
+    border-radius: 16px;
     position: relative;
     animation: fadeIn 0.3s ease-out;
-    backdrop-filter: blur(8px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(5px);
+    box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
     word-wrap: break-word;
-    min-width: 120px;
-    border: 1px solid rgba(129, 161, 193, 0.1);
+    min-width: 100px;
 }
 
 .message.user {
     align-self: flex-end;
-    background: linear-gradient(135deg, rgba(136, 192, 208, 0.2), rgba(129, 161, 193, 0.15));
-    border: 1px solid rgba(136, 192, 208, 0.3);
+    background: linear-gradient(135deg, #3498db, #1a5276);
+    border-bottom-right-radius: 5px;
 }
 
 .message.other {
     align-self: flex-start;
-    background: linear-gradient(135deg, rgba(67, 76, 94, 0.4), rgba(59, 66, 82, 0.3));
-    border: 1px solid rgba(129, 161, 193, 0.2);
+    background: linear-gradient(135deg, #2c3e50, #1a252f);
+    border-bottom-left-radius: 5px;
 }
 
 .message-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 8px;
-    font-size: 0.85rem;
+    margin-bottom: 6px;
+    font-size: 0.8rem;
 }
 
 .username {
-    font-weight: 600;
-    color: #88c0d0;
+    font-weight: bold;
+    color: #f1c40f;
 }
 
 .timestamp {
-    color: #d8dee9;
-    font-size: 0.75rem;
-    opacity: 0.7;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.7rem;
 }
 
 .message-content {
-    color: #eceff4;
+    color: white;
     font-size: 0.95rem;
-    line-height: 1.5;
-    font-weight: 400;
+    line-height: 1.4;
 }
 
 .message-image {
     max-width: 100%;
     max-height: 300px;
-    border-radius: 8px;
-    margin-top: 10px;
+    border-radius: 10px;
+    margin-top: 8px;
     display: block;
     height: auto;
     width: auto;
-    border: 1px solid rgba(129, 161, 193, 0.2);
 }
 
 .message-timer {
     position: absolute;
-    bottom: 6px;
-    right: 10px;
-    font-size: 0.65rem;
-    color: #d8dee9;
-    opacity: 0.6;
-    font-weight: 500;
+    bottom: 4px;
+    right: 8px;
+    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .input-container {
     padding: 15px;
-    background: rgba(59, 66, 82, 0.8);
-    border-top: 1px solid rgba(129, 161, 193, 0.3);
+    background: rgba(0, 0, 0, 0.25);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
     flex-shrink: 0;
 }
 
 .input-form {
     display: flex;
-    gap: 12px;
+    gap: 10px;
     align-items: center;
 }
 
@@ -210,81 +199,68 @@ body {
     flex: 1;
     display: flex;
     align-items: center;
-    background: rgba(67, 76, 94, 0.6);
-    border-radius: 28px;
-    padding: 4px 16px;
-    min-height: 48px;
-    border: 1px solid rgba(129, 161, 193, 0.2);
-    transition: all 0.3s ease;
-}
-
-.input-wrapper:focus-within {
-    background: rgba(76, 86, 106, 0.7);
-    border-color: rgba(136, 192, 208, 0.5);
-    box-shadow: 0 0 0 2px rgba(136, 192, 208, 0.3);
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 25px;
+    padding: 3px 12px;
+    min-height: 44px; /* Tamaño táctil adecuado */
 }
 
 .message-input {
     flex: 1;
-    padding: 12px 15px;
+    padding: 10px 12px;
     border: none;
     background: transparent;
-    color: #eceff4;
+    color: white;
     font-size: 1rem;
     outline: none;
     min-height: 40px;
-    font-weight: 400;
 }
 
 .message-input::placeholder {
-    color: #d8dee9;
-    opacity: 0.6;
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .attach-button {
     cursor: pointer;
-    padding: 10px;
+    padding: 8px;
     border-radius: 50%;
-    transition: all 0.3s ease;
+    transition: background-color 0.3s;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 40px;
-    min-height: 40px;
-    color: #88c0d0;
+    min-width: 36px;
+    min-height: 36px;
 }
 
 .attach-button:hover {
-    background: rgba(136, 192, 208, 0.2);
-    transform: scale(1.1);
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .attach-icon {
-    font-size: 1.2rem;
-    font-weight: 500;
+    font-size: 1.1rem;
+    color: white;
 }
 
 .send-button {
-    padding: 12px 24px;
+    padding: 12px 20px;
     border: none;
-    border-radius: 28px;
-    background: linear-gradient(135deg, #5e81ac, #81a1c1);
-    color: #2e3440;
-    font-size: 0.95rem;
-    font-weight: 600;
+    border-radius: 25px;
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    font-size: 0.9rem;
+    font-weight: bold;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
     white-space: nowrap;
-    min-width: 90px;
-    min-height: 48px;
-    letter-spacing: 0.5px;
+    min-width: 80px;
+    min-height: 44px; /* Tamaño táctil adecuado */
 }
 
 .send-button:hover {
-    background: linear-gradient(135deg, #81a1c1, #5e81ac);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(135deg, #2980b9, #1a5276);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
 .send-button:active {
@@ -292,62 +268,10 @@ body {
 }
 
 .send-button:disabled {
-    background: rgba(67, 76, 94, 0.5);
-    color: #d8dee9;
+    background: rgba(255, 255, 255, 0.2);
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
-}
-
-/* Indicador de "escribiendo" Nórdico */
-.typing-indicator {
-    display: flex;
-    align-items: center;
-    padding: 12px 18px;
-    background: rgba(67, 76, 94, 0.6);
-    border-radius: 20px;
-    margin: 5px 0;
-    align-self: flex-start;
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(129, 161, 193, 0.2);
-    max-width: 220px;
-}
-
-.typing-indicator-text {
-    color: #88c0d0;
-    font-size: 0.9rem;
-    margin-right: 10px;
-    font-weight: 500;
-}
-
-.typing-dots {
-    display: flex;
-    align-items: center;
-}
-
-.typing-dot {
-    width: 8px;
-    height: 8px;
-    background-color: #88c0d0;
-    border-radius: 50%;
-    margin: 0 3px;
-    animation: typing 1.4s infinite ease-in-out;
-    opacity: 0.8;
-}
-
-.typing-dot:nth-child(1) { animation-delay: 0s; }
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes typing {
-    0%, 60%, 100% {
-        transform: translateY(0);
-        opacity: 0.4;
-    }
-    30% {
-        transform: translateY(-6px);
-        opacity: 1;
-    }
 }
 
 @keyframes fadeIn {
@@ -376,26 +300,7 @@ body {
     animation: fadeOut 0.5s ease-out forwards;
 }
 
-/* Scrollbar Nórdico */
-.messages-container::-webkit-scrollbar {
-    width: 8px;
-}
-
-.messages-container::-webkit-scrollbar-track {
-    background: rgba(46, 52, 64, 0.3);
-    border-radius: 4px;
-}
-
-.messages-container::-webkit-scrollbar-thumb {
-    background: rgba(136, 192, 208, 0.3);
-    border-radius: 4px;
-}
-
-.messages-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(136, 192, 208, 0.5);
-}
-
-/* Responsive Design Nórdico */
+/* Responsive Design - Móvil primero */
 @media (max-width: 768px) {
     body {
         padding: 5px;
@@ -403,7 +308,7 @@ body {
     
     .app-container {
         height: 98vh;
-        border-radius: 12px;
+        border-radius: 15px;
     }
     
     .header {
@@ -495,22 +400,9 @@ body {
         min-width: 70px;
         min-height: 40px;
     }
-    
-    .typing-indicator {
-        padding: 8px 12px;
-        max-width: 180px;
-    }
-    
-    .typing-indicator-text {
-        font-size: 0.8rem;
-    }
-    
-    .typing-dot {
-        width: 6px;
-        height: 6px;
-    }
 }
 
+/* Pantallas muy pequeñas (móviles antiguos) */
 @media (max-width: 480px) {
     .app-container {
         height: 99vh;
@@ -567,22 +459,9 @@ body {
         min-width: 60px;
         min-height: 36px;
     }
-    
-    .typing-indicator {
-        padding: 6px 10px;
-        max-width: 160px;
-    }
-    
-    .typing-indicator-text {
-        font-size: 0.75rem;
-    }
-    
-    .typing-dot {
-        width: 5px;
-        height: 5px;
-    }
 }
 
+/* Tablets */
 @media (min-width: 769px) and (max-width: 1024px) {
     .app-container {
         height: 90vh;
@@ -606,6 +485,7 @@ body {
     }
 }
 
+/* Escritorio */
 @media (min-width: 1025px) {
     .app-container {
         height: 85vh;
@@ -675,6 +555,7 @@ body {
     }
 }
 
+/* Pantallas muy grandes (150+ pulgadas) */
 @media (min-width: 2000px) {
     .app-container {
         height: 80vh;
@@ -753,94 +634,25 @@ body {
         min-width: 150px;
         min-height: 60px;
     }
-    
-    .typing-indicator {
-        padding: 12px 18px;
-        max-width: 250px;
-    }
-    
-    .typing-indicator-text {
-        font-size: 1.2rem;
-    }
-    
-    .typing-dot {
-        width: 10px;
-        height: 10px;
-    }
 }
 
+/* Mejoras adicionales para accesibilidad */
 @media (hover: none) and (pointer: coarse) {
+    /* Para dispositivos táctiles */
     .attach-button:active,
     .send-button:active {
-        background-color: rgba(136, 192, 208, 0.3);
+        background-color: rgba(255, 255, 255, 0.3);
     }
 }
 
+/* Forzar scroll suave en todos los navegadores */
 .messages-container {
     -webkit-overflow-scrolling: touch;
 }
 
-/* Mejoras tipográficas Nórdicas */
+/* Mejorar contraste para mejor legibilidad */
 .message-content,
 .username,
-.timestamp,
-.connection-status,
-.header p {
-    font-feature-settings: "liga" 1, "kern" 1;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-
-/* Indicador de mensaje pendiente de lectura */
-.message.pending-read {
-    border-left: 3px solid #ebcb8b;
-    position: relative;
-}
-
-.message.pending-read::after {
-    content: "↻";
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    font-size: 0.8rem;
-    color: #ebcb8b;
-    animation: spin 2s linear infinite;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-/* Indicador de mensaje leído */
-.message.read {
-    border-left: 3px solid #a3be8c;
-}
-
-.message.read::after {
-    content: "✓";
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    font-size: 0.8rem;
-    color: #a3be8c;
-}
-
-/* Ajustes responsivos para los indicadores */
-@media (max-width: 768px) {
-    .message.pending-read::after,
-    .message.read::after {
-        font-size: 0.7rem;
-        top: 3px;
-        right: 3px;
-    }
-}
-
-@media (min-width: 2000px) {
-    .message.pending-read::after,
-    .message.read::after {
-        font-size: 1.2rem;
-        top: 8px;
-        right: 8px;
-    }
+.timestamp {
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
 }
