@@ -31,17 +31,17 @@ class ChatClient {
     }
 
     initializeSocket() {
-        const serverIP = window.location.hostname;
-        const serverPort = 3000;
-
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const wsHost = window.location.host;
         try {
-            this.socket = new WebSocket(`ws://${serverIP}:${serverPort}`);
-            this.setupWebSocketEvents();
+                this.socket = new WebSocket(`${wsProtocol}://${wsHost}`);
+                this.setupWebSocketEvents();
         } catch (error) {
-            console.error('Error al conectar al WebSocket:', error);
-            this.updateConnectionStatus(false);
-        }
+                console.error('Error al conectar al WebSocket:', error);
+                this.updateConnectionStatus(false);
+            }
     }
+
 
     setupWebSocketEvents() {
         this.socket.onopen = () => {
